@@ -7,8 +7,10 @@ function App() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [newUsers, setNewUsers] = useState([]);
+  const [userWithImages, setUserWithImages] = useState([]);
+  const [fullUsers, setFullUsers] = useState([]);
 
+  // Lazy-Load Users
   const observer = useRef();
   const lastUserRef = useCallback(node => {
     if (loading) return;
@@ -21,6 +23,7 @@ function App() {
     if (node) observer.current.observe(node)
   }, [loading])
 
+  // Fetch Users and Avatars
   const fetchUsers = () => {
     setLoading(true);
     setTimeout(() => {
@@ -28,6 +31,18 @@ function App() {
         .then((res) => {
           setUsers(prevUsers => {
             return [...prevUsers, ...res.data]
+          })
+          res.data.map((singleUser) => {
+            let singleName = singleUser.name;
+            axios.get(`https://avatars.dicebear.com/api/male/${singleName}.svg`)
+              .then((res) => {
+                const buff = new Buffer(res.data);
+                const base64Image = buff.toString('base64');
+
+                setUserWithImages(prevUserWithImages => {
+                  return [...prevUserWithImages, base64Image]
+                })
+              })
           })
           setLoading(false);
         })
@@ -47,38 +62,15 @@ function App() {
   }, [])
 
 
-  const fetchNewUsers = () => {
-    setLoading(true);
-      if(users.length > 1) {
-        users.map((newUser, index) => {
-          axios.get(`https://avatars.dicebear.com/api/male/${newUser.name}.svg`)
-            .then(res => {
-              const buff = new Buffer(res.data);
-              const base64Image = buff.toString('base64');
-              newUser.img = base64Image;
-  
-              setNewUsers(prevNewUsers => {
-                return [...prevNewUsers, newUser]
-              })
-              setLoading(false);
-            })
-            .catch(err => {
-              if(err) {
-                setError(err)
-              }
-              setLoading(false);
-            })
-        })
-      }
-  }
-
-  console.log(users.length)
-  
   useEffect(() => {
-    fetchNewUsers();
-
-  }, [users])
-
+    if(userWithImages.length > 1) {
+      setFullUsers(users.map((u, i) => (
+        {...u, 
+          'img': userWithImages.map(t => t)[0]
+        }
+        )))
+    }
+  }, [users, userWithImages])
 
 
   return (
@@ -87,7 +79,9 @@ function App() {
         {error && <p style={{color: 'red'}}>Sorry, something occured</p>}
         <h1 style={{textAlign: 'center'}}>User Profiles</h1>
 
-        {newUsers?.map((u, index) => {
+
+
+        {fullUsers?.map((u, index) => {
           if(users.length === index + 1) {
             return (
               <div ref={lastUserRef} key={index} style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
